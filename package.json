@@ -9,7 +9,11 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@ai-sdk/google": "^3.0.10",
+    "@ai-sdk/google-vertex": "^4.0.17",
+    "@ai-sdk/huggingface": "^1.0.13",
     "@radix-ui/react-slot": "^1.2.4",
+    "ai": "^6.0.39",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.562.0",
