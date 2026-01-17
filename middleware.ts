@@ -1,17 +1,24 @@
-import { getToken } from "next-auth/jwt";
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+// import { withAuth } from "next-auth/middleware";
 
-export async function middleware(req: NextRequest) {
-  const token = await getToken({ req });
+// export default withAuth({
+//   pages: {
+//     signIn: "/login",
+//   },
+// });
 
-  if (!token && req.nextUrl.pathname.startsWith("/chat")) {
-    return NextResponse.redirect(new URL("/login", req.url));
-  }
+// export const config = {
+//   matcher: ["/chat/:path*"],
+// };
 
-  return NextResponse.next();
-}
+
+import { withAuth } from "next-auth/middleware";
+
+export default withAuth({
+  pages: {
+    signIn: "/login",
+  },
+});
 
 export const config = {
-  matcher: ["/chat"],
+  matcher: ["/chat/:path*"], // ✅ ONLY protect UI routes
 };
