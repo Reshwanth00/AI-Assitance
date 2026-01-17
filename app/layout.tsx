@@ -1,10 +1,5 @@
-import type { Metadata } from "next";
 import "./globals.css";
-
-export const metadata: Metadata = {
-  title: "AI Assistant",
-  description: "AI-powered assistant with tool calling",
-};
+import { Providers } from "./providers";
 
 export default function RootLayout({
   children,
@@ -14,11 +9,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <header className="border-b p-4">
-          <h1 className="text-lg font-medium">AI Assistant</h1>
-        </header>
-
-        <main className="p-4">{children}</main>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
