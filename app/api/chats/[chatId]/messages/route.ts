@@ -1,38 +1,482 @@
+// // import { NextResponse } from "next/server";
+// // import { db } from "@/db";
+// // import { messages } from "@/db/schema";
+// // import { eq, asc } from "drizzle-orm";
+// // import { getServerSession } from "next-auth";
+// // import { authOptions } from "@/lib/auth";
+// // import { generateText } from "ai";
+// // import { huggingface } from "@ai-sdk/huggingface";
+
+// // // 🔹 IMPORT TOOLS
+// // import {
+// //   getWeather,
+// //   getF1Matches,
+// //   getStockPrice,
+// // } from "@/lib/tools";
+
+// // // 🔹 SYSTEM PROMPT
+// // const SYSTEM_PROMPT = `
+// // You are an AI assistant.
+
+// // You have access to the following tools:
+
+// // 1. getWeather(location: string)
+// //    Use this when the user asks about weather.
+
+// // 2. getF1Matches()
+// //    Use this when the user asks about Formula 1 or the next race.
+
+// // 3. getStockPrice(symbol: string)
+// //    Use this when the user asks about stock prices.
+
+// // If you need to use a tool, respond ONLY in valid JSON like this:
+
+// // {
+// //   "tool": "toolName",
+// //   "arguments": {
+// //     "key": "value"
+// //   }
+// // }
+
+// // If no tool is needed, respond with normal text.
+// // `;
+
+// // // =====================
+// // // GET: Fetch chat history
+// // // =====================
+// // export async function GET(
+// //   req: Request,
+// //   context: { params: Promise<{ chatId: string }> }
+// // ) {
+// //   const { chatId } = await context.params;
+
+// //   const session = await getServerSession(authOptions);
+// //   if (!session?.user?.email) {
+// //     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+// //   }
+
+// //   const data = await db
+// //     .select()
+// //     .from(messages)
+// //     .where(eq(messages.chatId, chatId))
+// //     .orderBy(asc(messages.createdAt));
+
+// //   return NextResponse.json(data);
+// // }
+
+// // // =====================
+// // // POST: Send message + AI/tool reply
+// // // =====================
+// // export async function POST(
+// //   req: Request,
+// //   context: { params: Promise<{ chatId: string }> }
+// // ) {
+// //   const { chatId } = await context.params;
+
+// //   const session = await getServerSession(authOptions);
+// //   if (!session?.user?.email) {
+// //     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+// //   }
+
+// //   const { messages: incomingMessages } = await req.json();
+
+// //   if (!incomingMessages?.length) {
+// //     return NextResponse.json(
+// //       { error: "Missing messages" },
+// //       { status: 400 }
+// //     );
+// //   }
+
+// //   const lastUserMessage =
+// //     incomingMessages[incomingMessages.length - 1];
+
+// //   // 1️⃣ Save USER message
+// //   await db.insert(messages).values({
+// //     chatId,
+// //     role: "user",
+// //     content: lastUserMessage.content,
+// //   });
+
+// //   // 2️⃣ Ask AI what to do
+// //   const result = await generateText({
+// //     model: huggingface("meta-llama/Meta-Llama-3-8B-Instruct"),
+// //     prompt: `
+// // ${SYSTEM_PROMPT}
+
+// // User: ${lastUserMessage.content}
+// // `,
+// //   });
+
+// //   // 3️⃣ Parse AI output
+// //   let aiParsedResponse: any;
+
+// //   try {
+// //     aiParsedResponse = JSON.parse(result.text);
+// //   } catch {
+// //     aiParsedResponse = {
+// //       type: "text",
+// //       text: result.text,
+// //     };
+// //   }
+
+// //   // 4️⃣ Execute tool IF AI requested it
+// //   let finalResponse: any = aiParsedResponse;
+
+// //   if (aiParsedResponse.tool === "getWeather") {
+// //     finalResponse = await getWeather(
+// //       aiParsedResponse.arguments.location
+// //     );
+// //   }
+
+// //   if (aiParsedResponse.tool === "getF1Matches") {
+// //     finalResponse = await getF1Matches();
+// //   }
+
+// //   if (
+// //     aiParsedResponse.tool === "getStockPrice" &&
+// //     aiParsedResponse.arguments?.symbol
+// //   ) {
+// //     finalResponse = await getStockPrice(
+// //       aiParsedResponse.arguments.symbol
+// //     );
+// //   }
+
+// //   // 5️⃣ Save AI / tool response
+// //   await db.insert(messages).values({
+// //     chatId,
+// //     role: "assistant",
+// //     content: JSON.stringify(finalResponse),
+// //   });
+
+// //   // 6️⃣ Return response
+// //   return NextResponse.json({
+// //     content: finalResponse,
+// //   });
+// // }
+
+
+
+
+// import { NextResponse } from "next/server";
+// import { db } from "@/db";
+// import { messages } from "@/db/schema";
+// import { eq, asc } from "drizzle-orm";
+// import { getServerSession } from "next-auth";
+// import { authOptions } from "@/lib/auth";
+// import { generateText } from "ai";
+// import { huggingface } from "@ai-sdk/huggingface";
+
+// import {
+//   getWeather,
+//   getF1Matches,
+//   getStockPrice,
+// } from "@/lib/tools";
+
+// // 🔒 VERY STRICT SYSTEM PROMPT (IMPORTANT)
+
+
+// function extractStockSymbol(text: string) {
+//   const match = text.match(/\b[A-Z]{2,5}\b/);
+//   return match ? match[0] : null;
+// }
+
+
+
+// const SYSTEM_PROMPT = `
+// You are a backend AI assistant.
+
+// You MUST follow these rules strictly.
+
+// Available tools:
+
+// 1. getWeather(location: string)
+// 2. getF1Matches()
+// 3. getStockPrice(symbol: string)
+
+// RULES:
+// - If the user asks about weather, YOU MUST return JSON.
+// - If the user asks about F1, YOU MUST return JSON.
+// - If the user asks about stock prices, YOU MUST return JSON.
+// - JSON MUST be VALID.
+// - DO NOT add extra text.
+// - DO NOT explain.
+// - DO NOT format as markdown.
+
+// VALID JSON FORMAT ONLY:
+
+// {
+//   "tool": "getWeather | getF1Matches | getStockPrice",
+//   "arguments": {
+//     "...": "..."
+//   }
+// }
+
+// If no tool is needed, return plain text ONLY.
+// `;
+
+
+// // =====================
+// // GET: Fetch chat history
+// // =====================
+// export async function GET(
+//   req: Request,
+//   context: { params: Promise<{ chatId: string }> }
+// ) {
+//   const { chatId } = await context.params;
+
+//   const session = await getServerSession(authOptions);
+//   if (!session?.user?.email) {
+//     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+//   }
+
+//   const data = await db
+//     .select()
+//     .from(messages)
+//     .where(eq(messages.chatId, chatId))
+//     .orderBy(asc(messages.createdAt));
+
+//   return NextResponse.json(data);
+// }
+
+// // =====================
+// // POST: Send message + AI/tool reply
+// // =====================
+// export async function POST(
+//   req: Request,
+//   context: { params: Promise<{ chatId: string }> }
+// ) {
+//   const { chatId } = await context.params;
+
+//   const session = await getServerSession(authOptions);
+//   if (!session?.user?.email) {
+//     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+//   }
+
+//   const body = await req.json();
+//   const incomingMessages = body.messages;
+
+//   if (!incomingMessages?.length) {
+//     return NextResponse.json(
+//       { error: "Missing messages" },
+//       { status: 400 }
+//     );
+//   }
+
+//   const lastUserMessage =
+//     incomingMessages[incomingMessages.length - 1];
+
+//   // 1️⃣ Save USER message
+//   await db.insert(messages).values({
+//     chatId,
+//     role: "user",
+//     content: lastUserMessage.content,
+//   });
+
+//   // 2️⃣ Ask AI (WITH STRICT PROMPT)
+//   const result = await generateText({
+//     model: huggingface("meta-llama/Meta-Llama-3-8B-Instruct"),
+//     prompt: `
+// ${SYSTEM_PROMPT}
+
+// User message:
+// "${lastUserMessage.content}"
+// `,
+//   });
+
+//   console.log("AI RAW RESPONSE:", result.text);
+
+//   // 3️⃣ Parse AI output
+//   let parsed: any;
+
+//   try {
+//     parsed = JSON.parse(result.text);
+//   } catch {
+//     // Normal text response
+//     const aiText = result.text;
+
+//     await db.insert(messages).values({
+//       chatId,
+//       role: "assistant",
+//       content: aiText,
+//     });
+
+//     return NextResponse.json({ content: aiText });
+//   }
+
+//   console.log("AI PARSED JSON:", parsed);
+
+//   // 4️⃣ Execute tool
+//   let finalResponse: any;
+
+//   if (parsed.tool === "getWeather" && parsed.arguments?.location) {
+//     finalResponse = await getWeather(parsed.arguments.location);
+//   }
+
+//   else if (parsed.tool === "getF1Matches") {
+//     finalResponse = await getF1Matches();
+//   }
+
+//   else if (parsed.tool === "getStockPrice") {
+//     const symbol =
+//       parsed.arguments?.symbol ||
+//       extractStockSymbol(lastUserMessage.content);
+
+//     if (!symbol) {
+//       finalResponse = {
+//         type: "error",
+//         message: "Stock symbol not found",
+//       };
+//     } else {
+//       finalResponse = await getStockPrice(symbol);
+//     }
+//   }
+
+
+//   else {
+//     finalResponse = {
+//       type: "error",
+//       message: "Invalid tool call",
+//     };
+//   }
+
+//   console.log("FINAL TOOL RESPONSE:", finalResponse);
+
+//   // 5️⃣ Save AI/tool response
+//   await db.insert(messages).values({
+//     chatId,
+//     role: "assistant",
+//     content: JSON.stringify(finalResponse),
+//   });
+
+//   // 6️⃣ Return response
+//   return NextResponse.json({
+//     content: finalResponse,
+//   });
+// }
+
+
+
+
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { messages } from "@/db/schema";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, desc, lt, and } from "drizzle-orm";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { generateText } from "ai";
 import { huggingface } from "@ai-sdk/huggingface";
 
-// =====================
-// GET: Fetch chat history
-// =====================
+import {
+  getWeather,
+  getF1Matches,
+  getStockPrice,
+} from "@/lib/tools";
+
+/* -----------------------------
+   🔧 Helper functions
+------------------------------ */
+
+function extractStockSymbol(text: string) {
+  const companyMap: Record<string, string> = {
+    apple: "AAPL",
+    tesla: "TSLA",
+    microsoft: "MSFT",
+    google: "GOOGL",
+    amazon: "AMZN",
+    meta: "META",
+  };
+
+  const lower = text.toLowerCase();
+
+  for (const name in companyMap) {
+    if (lower.includes(name)) {
+      return companyMap[name];
+    }
+  }
+
+  const match = text.match(/\b[A-Z]{2,5}\b/);
+  return match ? match[0] : null;
+}
+
+function extractLocation(text: string) {
+  const match = text.match(/in\s+([A-Za-z\s]+)/i);
+  return match ? match[1].trim() : null;
+}
+
+/* -----------------------------
+   🔒 SYSTEM PROMPT
+------------------------------ */
+
+const SYSTEM_PROMPT = `
+You are a conversational AI assistant.
+
+You may optionally call a tool if required.
+
+Available tools:
+1. getWeather(location: string)
+2. getF1Matches()
+3. getStockPrice(symbol: string)
+
+RULES:
+- If a tool is required, respond ONLY with valid JSON.
+- If no tool is required, respond with natural conversational text.
+- NEVER explain your reasoning.
+- NEVER mention tools unless calling them.
+- NEVER say "no tool is needed".
+
+Tool JSON format:
+
+{
+  "tool": "getWeather | getF1Matches | getStockPrice",
+  "arguments": { ... }
+}
+`;
+
+
+/* =====================
+   GET: Fetch messages
+===================== */
 export async function GET(
   req: Request,
   context: { params: Promise<{ chatId: string }> }
 ) {
   const { chatId } = await context.params;
+  const { searchParams } = new URL(req.url);
+
+  const cursor = searchParams.get("cursor"); // ISO timestamp
+  const limit = Number(searchParams.get("limit") ?? 20);
 
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // ✅ Build WHERE condition safely
+  const whereCondition = cursor
+    ? and(
+        eq(messages.chatId, chatId),
+        lt(messages.createdAt, new Date(cursor))
+      )
+    : eq(messages.chatId, chatId);
+
   const data = await db
     .select()
     .from(messages)
-    .where(eq(messages.chatId, chatId))
-    .orderBy(asc(messages.createdAt));
+    .where(whereCondition)
+    .orderBy(desc(messages.createdAt))
+    .limit(limit);
 
-  return NextResponse.json(data);
+  return NextResponse.json({
+    messages: data.reverse(), // oldest → newest
+    hasMore: data.length === limit,
+  });
 }
 
-// =====================
-// POST: Send message + get AI reply
-// =====================
+
+
+/* =====================
+   POST: Chat + Tools
+===================== */
 export async function POST(
   req: Request,
   context: { params: Promise<{ chatId: string }> }
@@ -45,44 +489,89 @@ export async function POST(
   }
 
   const { messages: incomingMessages } = await req.json();
-
   if (!incomingMessages?.length) {
-    return NextResponse.json(
-      { error: "Missing messages" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Missing messages" }, { status: 400 });
   }
 
-  const lastUserMessage =
-    incomingMessages[incomingMessages.length - 1];
+  const lastUserMessage = incomingMessages[incomingMessages.length - 1];
 
-  // 1️⃣ Save user message
+  /* 1️⃣ Save USER message */
   await db.insert(messages).values({
     chatId,
     role: "user",
     content: lastUserMessage.content,
   });
 
-  // 2️⃣ Generate AI response
-  const prompt = incomingMessages
-    .filter((m: any) => m.role === "user")
-    .map((m: any) => m.content)
-    .join("\n");
-
+  /* 2️⃣ Ask AI */
   const result = await generateText({
     model: huggingface("meta-llama/Meta-Llama-3-8B-Instruct"),
-    prompt,
+    prompt: `
+${SYSTEM_PROMPT}
+
+User message:
+"${lastUserMessage.content}"
+`,
   });
 
-  const aiText = result.text;
+  console.log("AI RAW RESPONSE:", result.text);
 
-  // 3️⃣ Save AI message
+  /* 3️⃣ Parse AI response */
+  let parsed: any;
+  try {
+    parsed = JSON.parse(result.text);
+  } catch {
+    // Normal text response
+    await db.insert(messages).values({
+      chatId,
+      role: "assistant",
+      content: result.text,
+    });
+
+    return NextResponse.json({ content: result.text });
+  }
+
+  console.log("AI PARSED JSON:", parsed);
+
+  /* 4️⃣ Execute tool */
+  let finalResponse: any;
+
+  if (parsed.tool === "getWeather") {
+    const location =
+      parsed.arguments?.location ||
+      extractLocation(lastUserMessage.content);
+
+    finalResponse = location
+      ? await getWeather(location)
+      : { type: "error", message: "Location not found" };
+  }
+
+  else if (parsed.tool === "getF1Matches") {
+    finalResponse = await getF1Matches();
+  }
+
+  else if (parsed.tool === "getStockPrice") {
+    const symbol =
+      parsed.arguments?.symbol ||
+      extractStockSymbol(lastUserMessage.content);
+
+    finalResponse = symbol
+      ? await getStockPrice(symbol)
+      : { type: "error", message: "Stock symbol not found" };
+  }
+
+  else {
+    finalResponse = { type: "error", message: "Invalid tool call" };
+  }
+
+  console.log("FINAL TOOL RESPONSE:", finalResponse);
+
+  /* 5️⃣ Save AI/tool response */
   await db.insert(messages).values({
     chatId,
     role: "assistant",
-    content: aiText,
+    content: JSON.stringify(finalResponse),
   });
 
-  // 4️⃣ Return AI response
-  return NextResponse.json({ content: aiText });
+  /* 6️⃣ Return response */
+  return NextResponse.json({ content: finalResponse });
 }

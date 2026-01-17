@@ -3,12 +3,16 @@ import { Button } from "@/components/ui/button";
 
 export default function Home() {
   return (
-    <div className="space-y-4">
-      <h2 className="text-lg font-medium">Welcome</h2>
+    <div className="h-screen flex items-center justify-center">
+      <div className="text-center space-y-6">
+        <h2 className="text-2xl font-semibold">
+          Welcome to AI Assistant
+        </h2>
 
-      <Link href="/login">
-        <Button>Go to Login</Button>
-      </Link>
+        <Link href="/login">
+          <Button size="lg">Go to Login</Button>
+        </Link>
+      </div>
     </div>
   );
 }
